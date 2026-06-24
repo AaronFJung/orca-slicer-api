@@ -132,7 +132,7 @@ jobs:
           fi
           
           docker stop "$CONTAINER_ID"
-          rm -rf /tmp/orca-data
+          rm -rf /tmp/orca-data || sudo rm -rf /tmp/orca-data
           
           echo "✅ All health checks passed!"
 
