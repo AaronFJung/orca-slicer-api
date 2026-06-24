@@ -3,13 +3,37 @@ import * as path from "path";
 import * as os from "os";
 import { execFile } from "child_process";
 import { AppError } from "../../middleware/error";
+import { getSystemProfilePath } from "../profiles/inheritance.service";
 import type {
   SlicingSettings,
   SliceResult,
   SliceMetaData,
   UploadedProfiles,
+  Category,
 } from "./models";
 import { Open } from "unzipper";
+
+const exists = (p: string) => fs.access(p).then(() => true, () => false);
+
+/**
+ * Resolves a profile name to an on-disk path, preferring a user-uploaded
+ * profile under DATA_PATH and falling back to the resolved system index.
+ */
+async function resolveProfilePath(
+  category: Category,
+  name: string,
+  basePath: string,
+): Promise<string> {
+  // 1. user-uploaded override wins
+  const uploadedPath = path.join(basePath, category, `${name}.json`);
+  if (await exists(uploadedPath)) return uploadedPath;
+
+  // 2. fall back to the resolved system profile (must exist on disk)
+  const systemPath = getSystemProfilePath(category, name);
+  if (systemPath && (await exists(systemPath))) return systemPath;
+
+  throw new AppError(400, `Profile "${name}" (${category}) was not found.`);
+}
 
 export async function sliceModel(
   file: Buffer,
@@ -65,17 +89,28 @@ export async function sliceModel(
     const settingsArg = `${inputDir}/printer.json;${inputDir}/preset.json`;
     args.push("--load-settings", settingsArg);
   } else if (settings.printer && settings.preset) {
-    const settingsArg = `${basePath}/printers/${settings.printer}.json;${basePath}/presets/${settings.preset}.json`;
-    args.push("--load-settings", settingsArg);
+    const printerPath = await resolveProfilePath(
+      "printers",
+      settings.printer,
+      basePath,
+    );
+    const presetPath = await resolveProfilePath(
+      "presets",
+      settings.preset,
+      basePath,
+    );
+    args.push("--load-settings", `${printerPath};${presetPath}`);
   }
 
   if (tempProfiles?.filament) {
     args.push("--load-filaments", `${inputDir}/filament.json`);
   } else if (settings.filament) {
-    args.push(
-      "--load-filaments",
-      `${basePath}/filaments/${settings.filament}.json`,
+    const filamentPath = await resolveProfilePath(
+      "filaments",
+      settings.filament,
+      basePath,
     );
+    args.push("--load-filaments", filamentPath);
   }
 
   if (settings.bedType) {

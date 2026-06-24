@@ -32,6 +32,17 @@ const searchCache: Record<Category, Map<string, string>> = {
   filaments: new Map<string, string>(),
 };
 
+/**
+ * Looks up the on-disk path of a resolved system profile by its exact name.
+ * @returns The absolute path to the resolved profile, or undefined if unknown.
+ */
+export function getSystemProfilePath(
+  category: Category,
+  name: string,
+): string | undefined {
+  return searchCache[category].get(name);
+}
+
 export async function resolveProfileInheritance(
   category: Category,
   profileContent: Buffer,
