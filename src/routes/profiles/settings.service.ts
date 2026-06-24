@@ -52,6 +52,9 @@ export async function listSettings(category: Category) {
       .filter((f) => f.endsWith(".json"))
       .map((f) => f.replace(/\.json$/, ""));
   } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return [];
+    }
     throw new AppError(
       500,
       `Failed to read settings directory`,
